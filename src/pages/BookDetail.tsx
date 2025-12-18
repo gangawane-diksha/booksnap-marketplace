@@ -28,6 +28,7 @@ export default function BookDetail() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   if (isLoading) {
     return (
@@ -95,6 +96,11 @@ export default function BookDetail() {
 
   const conditionKey = book.condition as BookCondition;
 
+  // Check if cover_image is a valid URL (not a blob URL which won't persist)
+  const isValidImageUrl = book.cover_image && !book.cover_image.startsWith('blob:');
+  const imageUrl = isValidImageUrl && !imageError ? book.cover_image : '/placeholder.svg';
+
+
   return (
     <Layout>
       <div className="container-booksnap py-8">
@@ -113,9 +119,10 @@ export default function BookDetail() {
             <div className="sticky top-24">
               <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-muted shadow-booksnap-lg">
                 <img
-                  src={book.cover_image || '/placeholder.svg'}
+                  src={imageUrl}
                   alt={book.title}
                   className="w-full h-full object-cover"
+                  onError={() => setImageError(true)}
                 />
               </div>
               
