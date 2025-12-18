@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, DollarSign, ShieldCheck, Truck, Loader2 } from 'lucide-react';
+import { ArrowRight, BookOpen, IndianRupee, ShieldCheck, Truck, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/Layout';
 import { SearchBar } from '@/components/SearchBar';
@@ -10,7 +10,7 @@ import { useBooks } from '@/hooks/useBooks';
 
 const features = [
   { icon: BookOpen, title: 'Vast Selection', description: 'Thousands of pre-loved books across all genres' },
-  { icon: DollarSign, title: 'Great Prices', description: 'Save up to 70% compared to new books' },
+  { icon: IndianRupee, title: 'Great Prices', description: 'Save up to 70% compared to new books' },
   { icon: ShieldCheck, title: 'Secure Trading', description: 'Safe transactions with buyer protection' },
   { icon: Truck, title: 'Easy Shipping', description: 'Convenient delivery or local pickup options' },
 ];
@@ -71,11 +71,14 @@ export default function Index() {
             <Button variant="ghost" asChild className="hidden sm:flex"><Link to="/browse">View All<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
-            {categories.map((category, index) => (
-              <div key={category.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
-                <CategoryCard {...category} />
-              </div>
-            ))}
+            {categories.map((category, index) => {
+              const categoryCount = books?.filter(book => book.category.toLowerCase().replace(/[^a-z]/g, '-').includes(category.id)).length || 0;
+              return (
+                <div key={category.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
+                  <CategoryCard {...category} count={categoryCount} />
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
