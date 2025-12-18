@@ -145,10 +145,10 @@ export default function BookDetail() {
 
             {/* Price */}
             <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-bold text-primary">${Number(book.price).toFixed(2)}</span>
+              <span className="text-4xl font-bold text-primary">₹{Number(book.price).toFixed(0)}</span>
               {book.original_price && (
                 <span className="text-xl text-muted-foreground line-through">
-                  ${Number(book.original_price).toFixed(2)}
+                  ₹{Number(book.original_price).toFixed(0)}
                 </span>
               )}
             </div>
@@ -273,7 +273,7 @@ export default function BookDetail() {
             <div className="bg-sage-light/50 rounded-xl p-4 space-y-2">
               <p className="flex items-center gap-2 text-sm">
                 <Check className="h-4 w-4 text-sage-dark" />
-                <span>Free shipping on orders over $25</span>
+                <span>Free shipping on orders over ₹500</span>
               </p>
               <p className="flex items-center gap-2 text-sm">
                 <Check className="h-4 w-4 text-sage-dark" />
