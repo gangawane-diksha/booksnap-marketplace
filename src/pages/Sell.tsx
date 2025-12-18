@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, X, BookOpen, DollarSign, Info, Check, Loader2 } from 'lucide-react';
+import { Upload, X, BookOpen, IndianRupee, Info, Check, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { BookCard } from '@/components/BookCard';
@@ -31,6 +31,7 @@ export default function Sell() {
     originalPrice: '',
     description: '',
     images: [] as string[],
+    imageFiles: [] as File[],
   });
   const [isUploading, setIsUploading] = useState(false);
 
@@ -38,11 +39,13 @@ export default function Sell() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // For now, create object URLs for preview (in production, you'd upload to Supabase Storage)
-    const newImages = Array.from(files).map((file) => URL.createObjectURL(file));
+    const newFiles = Array.from(files);
+    const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
+    
     setFormData((prev) => ({
       ...prev,
-      images: [...prev.images, ...newImages].slice(0, 5),
+      images: [...prev.images, ...newPreviews].slice(0, 5),
+      imageFiles: [...prev.imageFiles, ...newFiles].slice(0, 5),
     }));
   };
 
@@ -50,6 +53,7 @@ export default function Sell() {
     setFormData((prev) => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index),
+      imageFiles: prev.imageFiles.filter((_, i) => i !== index),
     }));
   };
 
@@ -64,7 +68,39 @@ export default function Sell() {
       return;
     }
 
+    if (!user) {
+      toast({
+        title: 'Please log in to sell books',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
+      setIsUploading(true);
+      let coverImageUrl: string | null = null;
+
+      // Upload image to Supabase Storage if exists
+      if (formData.imageFiles.length > 0) {
+        const file = formData.imageFiles[0];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('book-covers')
+          .upload(fileName, file);
+
+        if (uploadError) {
+          throw new Error('Failed to upload image: ' + uploadError.message);
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from('book-covers')
+          .getPublicUrl(fileName);
+
+        coverImageUrl = publicUrlData.publicUrl;
+      }
+
       await createBook.mutateAsync({
         title: formData.title,
         author: formData.author,
@@ -74,7 +110,7 @@ export default function Sell() {
         price: parseFloat(formData.price),
         original_price: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
         description: formData.description || null,
-        cover_image: formData.images[0] || null,
+        cover_image: coverImageUrl,
       });
 
       // Reset form
@@ -88,9 +124,12 @@ export default function Sell() {
         originalPrice: '',
         description: '',
         images: [],
+        imageFiles: [],
       });
     } catch (error) {
       console.error('Error creating book:', error);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -219,16 +258,16 @@ export default function Sell() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Price ($) *</label>
+                    <label className="block text-sm font-medium mb-2">Price (₹) *</label>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="1"
                         value={formData.price}
                         onChange={(e) => setFormData((prev) => ({ ...prev, price: e.target.value }))}
-                        placeholder="0.00"
+                        placeholder="0"
                         className="w-full pl-10 pr-4 py-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                         required
                       />
@@ -237,14 +276,14 @@ export default function Sell() {
                   <div>
                     <label className="block text-sm font-medium mb-2">Original Price (Optional)</label>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="1"
                         value={formData.originalPrice}
                         onChange={(e) => setFormData((prev) => ({ ...prev, originalPrice: e.target.value }))}
-                        placeholder="0.00"
+                        placeholder="0"
                         className="w-full pl-10 pr-4 py-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                     </div>
@@ -303,10 +342,10 @@ export default function Sell() {
                   type="submit" 
                   variant="hero" 
                   size="lg" 
-                  disabled={createBook.isPending} 
+                  disabled={createBook.isPending || isUploading} 
                   className="flex-1"
                 >
-                  {createBook.isPending ? (
+                  {(createBook.isPending || isUploading) ? (
                     <>
                       <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                       Publishing...
