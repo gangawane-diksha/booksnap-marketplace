@@ -18,7 +18,7 @@ export default function Cart() {
   };
 
   const subtotal = cartItems?.reduce((sum, item) => sum + Number(item.book.price) * item.quantity, 0) || 0;
-  const shipping = subtotal > 25 ? 0 : 4.99;
+  const shipping = subtotal > 500 ? 0 : 49;
   const total = subtotal + shipping;
 
   if (isLoading) {
@@ -87,7 +87,7 @@ export default function Cart() {
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="font-bold text-primary">
-                            ${(Number(item.book.price) * item.quantity).toFixed(2)}
+                            ₹{(Number(item.book.price) * item.quantity).toFixed(0)}
                           </span>
                           <button
                             onClick={() => handleRemove(item.id)}
@@ -110,20 +110,20 @@ export default function Cart() {
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span>${subtotal.toFixed(2)}</span>
+                      <span>₹{subtotal.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Shipping</span>
-                      <span>{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                      <span>{shipping === 0 ? 'Free' : `₹${shipping.toFixed(0)}`}</span>
                     </div>
                     {shipping > 0 && (
                       <p className="text-xs text-sage-dark">
-                        Add ${(25 - subtotal).toFixed(2)} more for free shipping
+                        Add ₹{(500 - subtotal).toFixed(0)} more for free shipping
                       </p>
                     )}
                     <div className="border-t border-border pt-3 flex justify-between font-semibold text-base">
                       <span>Total</span>
-                      <span className="text-primary">${total.toFixed(2)}</span>
+                      <span className="text-primary">₹{total.toFixed(0)}</span>
                     </div>
                   </div>
                   <Button variant="hero" className="w-full mt-6">

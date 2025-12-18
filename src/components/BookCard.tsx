@@ -102,10 +102,10 @@ export function BookCard({ book }: BookCardProps) {
         
         {/* Price */}
         <div className="flex items-center gap-2 mt-3">
-          <span className="text-lg font-bold text-primary">${Number(book.price).toFixed(2)}</span>
+          <span className="text-lg font-bold text-primary">₹{Number(book.price).toFixed(0)}</span>
           {book.original_price && (
             <span className="text-sm text-muted-foreground line-through">
-              ${Number(book.original_price).toFixed(2)}
+              ₹{Number(book.original_price).toFixed(0)}
             </span>
           )}
         </div>
