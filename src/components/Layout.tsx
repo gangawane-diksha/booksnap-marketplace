@@ -13,6 +13,7 @@ export function Layout({ children }: LayoutProps) {
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
+      <ChatButton />
     </div>
   );
 }
