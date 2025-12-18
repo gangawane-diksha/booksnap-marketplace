@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Navbar } from './Navbar';
+import { ChatButton } from './ChatButton';
 import { Footer } from './Footer';
 
 interface LayoutProps {

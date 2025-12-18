@@ -1,42 +1,35 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Trash2, ShoppingBag, ArrowRight, Minus, Plus } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, Minus, Plus, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { mockBooks } from '@/data/mockBooks';
-import { cn } from '@/lib/utils';
-
-interface CartItem {
-  book: typeof mockBooks[0];
-  quantity: number;
-}
+import { useCart, useUpdateCartQuantity, useRemoveFromCart } from '@/hooks/useCart';
 
 export default function Cart() {
-  // Mock cart - in a real app, this would come from state/context
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    { book: mockBooks[0], quantity: 1 },
-    { book: mockBooks[1], quantity: 1 },
-  ]);
+  const { data: cartItems, isLoading } = useCart();
+  const updateQuantity = useUpdateCartQuantity();
+  const removeFromCart = useRemoveFromCart();
 
-  const updateQuantity = (bookId: string, delta: number) => {
-    setCartItems((items) =>
-      items
-        .map((item) =>
-          item.book.id === bookId
-            ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    );
+  const handleUpdateQuantity = (itemId: string, currentQuantity: number, delta: number) => {
+    updateQuantity.mutate({ itemId, quantity: currentQuantity + delta });
   };
 
-  const removeItem = (bookId: string) => {
-    setCartItems((items) => items.filter((item) => item.book.id !== bookId));
+  const handleRemove = (itemId: string) => {
+    removeFromCart.mutate(itemId);
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.book.price * item.quantity, 0);
+  const subtotal = cartItems?.reduce((sum, item) => sum + Number(item.book.price) * item.quantity, 0) || 0;
   const shipping = subtotal > 25 ? 0 : 4.99;
   const total = subtotal + shipping;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container-booksnap py-16 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -44,22 +37,22 @@ export default function Cart() {
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-serif font-bold text-foreground">Shopping Cart</h1>
           <p className="text-muted-foreground mt-2">
-            {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'} in your cart
+            {cartItems?.length || 0} {(cartItems?.length || 0) === 1 ? 'item' : 'items'} in your cart
           </p>
 
-          {cartItems.length > 0 ? (
+          {cartItems && cartItems.length > 0 ? (
             <div className="mt-8 grid lg:grid-cols-3 gap-8">
               {/* Cart Items */}
               <div className="lg:col-span-2 space-y-4">
                 {cartItems.map((item, index) => (
                   <div
-                    key={item.book.id}
+                    key={item.id}
                     className="flex gap-4 p-4 bg-card rounded-xl border border-border animate-fade-in"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
                     <Link to={`/book/${item.book.id}`} className="flex-shrink-0">
                       <img
-                        src={item.book.coverImage}
+                        src={item.book.cover_image || '/placeholder.svg'}
                         alt={item.book.title}
                         className="w-24 h-32 object-cover rounded-lg"
                       />
@@ -77,26 +70,29 @@ export default function Cart() {
                       <div className="flex items-center justify-between mt-4">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.book.id, -1)}
+                            onClick={() => handleUpdateQuantity(item.id, item.quantity, -1)}
                             className="p-1 rounded-md hover:bg-muted transition-colors"
+                            disabled={updateQuantity.isPending}
                           >
                             <Minus className="h-4 w-4" />
                           </button>
                           <span className="w-8 text-center font-medium">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.book.id, 1)}
+                            onClick={() => handleUpdateQuantity(item.id, item.quantity, 1)}
                             className="p-1 rounded-md hover:bg-muted transition-colors"
+                            disabled={updateQuantity.isPending}
                           >
                             <Plus className="h-4 w-4" />
                           </button>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="font-bold text-primary">
-                            ${(item.book.price * item.quantity).toFixed(2)}
+                            ${(Number(item.book.price) * item.quantity).toFixed(2)}
                           </span>
                           <button
-                            onClick={() => removeItem(item.book.id)}
+                            onClick={() => handleRemove(item.id)}
                             className="p-2 text-muted-foreground hover:text-destructive transition-colors"
+                            disabled={removeFromCart.isPending}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

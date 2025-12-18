@@ -1,20 +1,43 @@
-import { useParams, Link } from 'react-router-dom';
-import { Heart, Star, MapPin, MessageCircle, ShoppingCart, Share2, ArrowLeft, Check } from 'lucide-react';
+import { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Heart, Star, MapPin, MessageCircle, ShoppingCart, Share2, Check, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { BookCard } from '@/components/BookCard';
-import { mockBooks, conditionColors } from '@/data/mockBooks';
+import { conditionColors, BookCondition } from '@/data/mockBooks';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useBook, useBooks } from '@/hooks/useBooks';
+import { useAddToCart } from '@/hooks/useCart';
+import { useToggleWishlist, useWishlist } from '@/hooks/useWishlist';
+import { useStartConversation } from '@/hooks/useChat';
+import { useAuth } from '@/hooks/useAuth';
+import { ChatBox } from '@/components/ChatBox';
 
 export default function BookDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const { user } = useAuth();
+  const { data: book, isLoading } = useBook(id || '');
+  const { data: allBooks } = useBooks();
+  const { data: wishlist } = useWishlist();
+  const addToCart = useAddToCart();
+  const toggleWishlist = useToggleWishlist();
+  const startConversation = useStartConversation();
   const [addedToCart, setAddedToCart] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
-  const book = mockBooks.find((b) => b.id === id);
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container-booksnap py-16 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   if (!book) {
     return (
@@ -29,28 +52,48 @@ export default function BookDetail() {
     );
   }
 
-  const relatedBooks = mockBooks.filter((b) => b.category === book.category && b.id !== book.id).slice(0, 4);
-  const discount = book.originalPrice
-    ? Math.round(((book.originalPrice - book.price) / book.originalPrice) * 100)
+  const relatedBooks = allBooks?.filter((b) => b.category === book.category && b.id !== book.id).slice(0, 4) || [];
+  const discount = book.original_price
+    ? Math.round(((Number(book.original_price) - Number(book.price)) / Number(book.original_price)) * 100)
     : null;
+  const isWishlisted = wishlist?.some((item) => item.book.id === book.id) ?? false;
+  const isOwnBook = user?.id === book.seller_id;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    await addToCart.mutateAsync({ bookId: book.id });
     setAddedToCart(true);
-    toast({
-      title: 'Added to cart!',
-      description: `${book.title} has been added to your cart.`,
-    });
   };
 
   const handleWishlist = () => {
-    setIsWishlisted(!isWishlisted);
-    toast({
-      title: isWishlisted ? 'Removed from wishlist' : 'Added to wishlist!',
-      description: isWishlisted
-        ? `${book.title} removed from your wishlist.`
-        : `${book.title} saved to your wishlist.`,
-    });
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    toggleWishlist.mutate(book.id);
   };
+
+  const handleContact = async () => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    try {
+      const conv = await startConversation.mutateAsync({
+        bookId: book.id,
+        sellerId: book.seller_id,
+      });
+      setConversationId(conv.id);
+      setChatOpen(true);
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+    }
+  };
+
+  const conditionKey = book.condition as BookCondition;
 
   return (
     <Layout>
@@ -70,7 +113,7 @@ export default function BookDetail() {
             <div className="sticky top-24">
               <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-muted shadow-booksnap-lg">
                 <img
-                  src={book.coverImage}
+                  src={book.cover_image || '/placeholder.svg'}
                   alt={book.title}
                   className="w-full h-full object-cover"
                 />
@@ -78,10 +121,10 @@ export default function BookDetail() {
               
               {/* Badges */}
               <div className="absolute top-4 left-4 flex flex-col gap-2">
-                <span className={cn('px-3 py-1 rounded-full text-sm font-medium', conditionColors[book.condition])}>
+                <span className={cn('px-3 py-1 rounded-full text-sm font-medium', conditionColors[conditionKey])}>
                   {book.condition}
                 </span>
-                {discount && (
+                {discount && discount > 0 && (
                   <span className="px-3 py-1 rounded-full text-sm font-bold bg-terracotta text-primary-foreground">
                     Save {discount}%
                   </span>
@@ -102,10 +145,10 @@ export default function BookDetail() {
 
             {/* Price */}
             <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-bold text-primary">${book.price.toFixed(2)}</span>
-              {book.originalPrice && (
+              <span className="text-4xl font-bold text-primary">${Number(book.price).toFixed(2)}</span>
+              {book.original_price && (
                 <span className="text-xl text-muted-foreground line-through">
-                  ${book.originalPrice.toFixed(2)}
+                  ${Number(book.original_price).toFixed(2)}
                 </span>
               )}
             </div>
@@ -114,37 +157,50 @@ export default function BookDetail() {
             <div className="bg-card rounded-xl p-4 border border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-sage-light flex items-center justify-center">
-                    <span className="text-lg font-semibold text-sage-dark">
-                      {book.seller.name.charAt(0)}
-                    </span>
+                  <div className="w-12 h-12 rounded-full bg-sage-light flex items-center justify-center overflow-hidden">
+                    {book.seller.avatar_url ? (
+                      <img src={book.seller.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-lg font-semibold text-sage-dark">
+                        {book.seller.name.charAt(0)}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <p className="font-medium">{book.seller.name}</p>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Star className="h-4 w-4 fill-terracotta text-terracotta" />
-                        {book.seller.rating}
+                        5.0
                       </span>
                       <span className="flex items-center gap-1">
                         <MapPin className="h-4 w-4" />
-                        {book.seller.location}
+                        Online
                       </span>
                     </div>
                   </div>
                 </div>
-                <Button variant="outline" size="sm">
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Contact
-                </Button>
+                {!isOwnBook && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleContact}
+                    disabled={startConversation.isPending}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Contact
+                  </Button>
+                )}
               </div>
             </div>
 
             {/* Description */}
-            <div>
-              <h2 className="font-serif font-semibold text-lg mb-3">Description</h2>
-              <p className="text-muted-foreground leading-relaxed">{book.description}</p>
-            </div>
+            {book.description && (
+              <div>
+                <h2 className="font-serif font-semibold text-lg mb-3">Description</h2>
+                <p className="text-muted-foreground leading-relaxed">{book.description}</p>
+              </div>
+            )}
 
             {/* Book Details */}
             <div className="grid grid-cols-2 gap-4">
@@ -154,10 +210,10 @@ export default function BookDetail() {
                   <p className="font-medium">{book.isbn}</p>
                 </div>
               )}
-              {book.publishedYear && (
+              {book.published_year && (
                 <div className="bg-muted/50 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">Published</p>
-                  <p className="font-medium">{book.publishedYear}</p>
+                  <p className="font-medium">{book.published_year}</p>
                 </div>
               )}
               {book.pages && (
@@ -173,33 +229,45 @@ export default function BookDetail() {
             </div>
 
             {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button
-                variant="hero"
-                size="lg"
-                className="flex-1"
-                onClick={handleAddToCart}
-                disabled={addedToCart}
-              >
-                {addedToCart ? (
-                  <>
-                    <Check className="h-5 w-5 mr-2" />
-                    Added to Cart
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="h-5 w-5 mr-2" />
-                    Add to Cart
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" size="lg" onClick={handleWishlist}>
-                <Heart className={cn('h-5 w-5', isWishlisted && 'fill-terracotta text-terracotta')} />
-              </Button>
-              <Button variant="outline" size="lg">
-                <Share2 className="h-5 w-5" />
-              </Button>
-            </div>
+            {!isOwnBook && (
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <Button
+                  variant="hero"
+                  size="lg"
+                  className="flex-1"
+                  onClick={handleAddToCart}
+                  disabled={addedToCart || addToCart.isPending}
+                >
+                  {addedToCart ? (
+                    <>
+                      <Check className="h-5 w-5 mr-2" />
+                      Added to Cart
+                    </>
+                  ) : addToCart.isPending ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="h-5 w-5 mr-2" />
+                      Add to Cart
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={handleWishlist}
+                  disabled={toggleWishlist.isPending}
+                >
+                  <Heart className={cn('h-5 w-5', isWishlisted && 'fill-terracotta text-terracotta')} />
+                </Button>
+                <Button variant="outline" size="lg">
+                  <Share2 className="h-5 w-5" />
+                </Button>
+              </div>
+            )}
 
             {/* Shipping Info */}
             <div className="bg-sage-light/50 rounded-xl p-4 space-y-2">
@@ -230,13 +298,30 @@ export default function BookDetail() {
                   className="animate-fade-in"
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <BookCard book={relatedBook} />
+                  <BookCard book={{
+                    ...relatedBook,
+                    cover_image: relatedBook.cover_image,
+                    original_price: relatedBook.original_price,
+                    seller: {
+                      id: relatedBook.seller.id,
+                      name: relatedBook.seller.name,
+                      rating: 5.0,
+                      location: 'Online',
+                    },
+                  }} />
                 </div>
               ))}
             </div>
           </section>
         )}
       </div>
+
+      {/* Chat Box */}
+      <ChatBox 
+        isOpen={chatOpen} 
+        onClose={() => setChatOpen(false)} 
+        initialConversationId={conversationId || undefined}
+      />
     </Layout>
   );
 }
