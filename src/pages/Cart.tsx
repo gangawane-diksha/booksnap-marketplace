@@ -126,8 +126,8 @@ export default function Cart() {
                       <span className="text-primary">₹{total.toFixed(0)}</span>
                     </div>
                   </div>
-                  <Button variant="hero" className="w-full mt-6">
-                    Proceed to Checkout
+                  <Button variant="hero" className="w-full mt-6" asChild>
+                    <Link to="/messages">Proceed to Chat</Link>
                   </Button>
                   <Button variant="ghost" asChild className="w-full mt-2">
                     <Link to="/browse">Continue Shopping</Link>
