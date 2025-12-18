@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Upload, X, BookOpen, DollarSign, Info, Check } from 'lucide-react';
+import { Upload, X, BookOpen, DollarSign, Info, Check, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { BookCard } from '@/components/BookCard';
 import { BookCondition, conditionColors } from '@/data/mockBooks';
 import { cn } from '@/lib/utils';
+import { useCreateBook } from '@/hooks/useBooks';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 const conditions: { value: BookCondition; description: string }[] = [
@@ -15,7 +18,9 @@ const conditions: { value: BookCondition; description: string }[] = [
 ];
 
 export default function Sell() {
+  const { user } = useAuth();
   const { toast } = useToast();
+  const createBook = useCreateBook();
   const [formData, setFormData] = useState({
     title: '',
     author: '',
@@ -23,20 +28,22 @@ export default function Sell() {
     category: '',
     condition: '' as BookCondition | '',
     price: '',
+    originalPrice: '',
     description: '',
     images: [] as string[],
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      const newImages = Array.from(files).map((file) => URL.createObjectURL(file));
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, ...newImages].slice(0, 5),
-      }));
-    }
+    if (!files || files.length === 0) return;
+
+    // For now, create object URLs for preview (in production, you'd upload to Supabase Storage)
+    const newImages = Array.from(files).map((file) => URL.createObjectURL(file));
+    setFormData((prev) => ({
+      ...prev,
+      images: [...prev.images, ...newImages].slice(0, 5),
+    }));
   };
 
   const removeImage = (index: number) => {
@@ -48,28 +55,43 @@ export default function Sell() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    toast({
-      title: 'Book listed successfully!',
-      description: 'Your book is now visible to potential buyers.',
-    });
-    
-    setIsSubmitting(false);
-    // Reset form
-    setFormData({
-      title: '',
-      author: '',
-      isbn: '',
-      category: '',
-      condition: '',
-      price: '',
-      description: '',
-      images: [],
-    });
+    if (!formData.condition) {
+      toast({
+        title: 'Please select a condition',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await createBook.mutateAsync({
+        title: formData.title,
+        author: formData.author,
+        isbn: formData.isbn || null,
+        category: formData.category,
+        condition: formData.condition as 'New' | 'Like New' | 'Good' | 'Acceptable',
+        price: parseFloat(formData.price),
+        original_price: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
+        description: formData.description || null,
+        cover_image: formData.images[0] || null,
+      });
+
+      // Reset form
+      setFormData({
+        title: '',
+        author: '',
+        isbn: '',
+        category: '',
+        condition: '',
+        price: '',
+        originalPrice: '',
+        description: '',
+        images: [],
+      });
+    } catch (error) {
+      console.error('Error creating book:', error);
+    }
   };
 
   const previewBook = formData.title && formData.condition
@@ -78,11 +100,12 @@ export default function Sell() {
         title: formData.title || 'Book Title',
         author: formData.author || 'Author Name',
         price: parseFloat(formData.price) || 0,
-        condition: (formData.condition || 'Good') as BookCondition,
+        original_price: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
+        condition: (formData.condition || 'Good') as string,
         category: formData.category || 'Fiction',
         description: formData.description || '',
-        coverImage: formData.images[0] || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop',
-        seller: { name: 'You', rating: 5.0, location: 'Your Location' },
+        cover_image: formData.images[0] || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop',
+        seller: { name: user?.user_metadata?.full_name || 'You', rating: 5.0, location: 'Your Location' },
       }
     : null;
 
@@ -211,6 +234,21 @@ export default function Sell() {
                       />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Original Price (Optional)</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.originalPrice}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, originalPrice: e.target.value }))}
+                        placeholder="0.00"
+                        className="w-full pl-10 pr-4 py-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -261,11 +299,21 @@ export default function Sell() {
 
               {/* Submit */}
               <div className="flex gap-4">
-                <Button type="submit" variant="hero" size="lg" disabled={isSubmitting} className="flex-1">
-                  {isSubmitting ? 'Publishing...' : 'Publish Listing'}
-                </Button>
-                <Button type="button" variant="outline" size="lg">
-                  Save Draft
+                <Button 
+                  type="submit" 
+                  variant="hero" 
+                  size="lg" 
+                  disabled={createBook.isPending} 
+                  className="flex-1"
+                >
+                  {createBook.isPending ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Publishing...
+                    </>
+                  ) : (
+                    'Publish Listing'
+                  )}
                 </Button>
               </div>
             </form>

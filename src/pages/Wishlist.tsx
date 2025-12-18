@@ -1,13 +1,22 @@
 import { Link } from 'react-router-dom';
-import { Heart, ArrowRight } from 'lucide-react';
+import { Heart, ArrowRight, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { BookCard } from '@/components/BookCard';
-import { mockBooks } from '@/data/mockBooks';
+import { useWishlist } from '@/hooks/useWishlist';
 
 export default function Wishlist() {
-  // Mock wishlist - in a real app, this would come from state/database
-  const wishlistBooks = mockBooks.slice(0, 3);
+  const { data: wishlistItems, isLoading } = useWishlist();
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container-booksnap py-16 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -16,15 +25,24 @@ export default function Wishlist() {
           <h1 className="text-3xl font-serif font-bold text-foreground">My Wishlist</h1>
           <p className="text-muted-foreground mt-2">Books you've saved for later</p>
 
-          {wishlistBooks.length > 0 ? (
+          {wishlistItems && wishlistItems.length > 0 ? (
             <div className="mt-8 grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6">
-              {wishlistBooks.map((book, index) => (
+              {wishlistItems.map((item, index) => (
                 <div
-                  key={book.id}
+                  key={item.id}
                   className="animate-fade-in"
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <BookCard book={book} />
+                  <BookCard book={{
+                    id: item.book.id,
+                    title: item.book.title,
+                    author: item.book.author,
+                    price: item.book.price,
+                    original_price: item.book.original_price,
+                    condition: item.book.condition,
+                    cover_image: item.book.cover_image,
+                    category: item.book.category,
+                  }} />
                 </div>
               ))}
             </div>
