@@ -11,10 +11,10 @@ import { useBooks } from '@/hooks/useBooks';
 
 const conditions: BookCondition[] = ['New', 'Like New', 'Good', 'Acceptable'];
 const priceRanges = [
-  { label: 'Under $5', min: 0, max: 5 },
-  { label: '$5 - $10', min: 5, max: 10 },
-  { label: '$10 - $20', min: 10, max: 20 },
-  { label: 'Over $20', min: 20, max: Infinity },
+  { label: 'Under ₹100', min: 0, max: 100 },
+  { label: '₹100 - ₹300', min: 100, max: 300 },
+  { label: '₹300 - ₹500', min: 300, max: 500 },
+  { label: 'Over ₹500', min: 500, max: Infinity },
 ];
 
 export default function Browse() {
